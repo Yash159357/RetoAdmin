@@ -1,15 +1,11 @@
-//Copied this entire section from 'category_screen' page and did the required changes
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:reto_admin/views/side_bar_screens/widgets/banner_list_widget.dart';
-import 'package:reto_admin/views/side_bar_screens/widgets/category_list_widget.dart';
 
 class UploadBannerScreen extends StatefulWidget {
-
   static const String id = '\UploadBannerScreen';
 
   const UploadBannerScreen({super.key});
@@ -19,170 +15,286 @@ class UploadBannerScreen extends StatefulWidget {
 }
 
 class _UploadBannerScreenState extends State<UploadBannerScreen> {
-
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>(); //Creating Form Key in order to check and validate our 'Type the Category Name' Form created down.
-
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final FirebaseStorage _firebaseStorage = FirebaseStorage.instance;
-
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  dynamic _image; //We will store the picked up image in this variable
+  dynamic _image;
+  String?
+  fileName; // Keep this for internal use only, won't be stored in Firestore
 
-  String ? fileName; //In this variable we will store the file name of the image by which it is saved in our local system.
+  // Theme colors to match the order list widget
+  final Color primaryThemeColor = const Color.fromARGB(255, 255, 246, 233);
+  final Color accentThemeColor = const Color.fromARGB(210, 248, 186, 94);
 
-
-
-  //Creating a Function that will let us pick image from our local system and which will be send and saved in our Firebase.
-  pickImage() async{
-    FilePickerResult? result = await FilePicker.platform.pickFiles( //Here '?' means it makes our variable 'result' nullable because it may happen that our user doesn't select any image and press 'Save' and in that case we will face an Error but with this we will avoid such situations.
-      type: FileType.image, //With this we can pick up only Images. Extra Info: We can also pick up audio files with this 'FileType'.
-      allowMultiple: false, //With this being 'false' we can't select multiple Images
+  pickImage() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
     );
 
-    if(result!=null) { //This means it is not empty and the user has successfully picked up an image.
+    if (result != null) {
       setState(() {
         _image = result.files.first.bytes;
         fileName = result.files.first.name;
       });
     }
-
   }
 
+  _uploadImageToStorage(dynamic image) async {
+    // Generate a unique filename using timestamp to avoid conflicts
+    String uniqueFileName =
+        DateTime.now().millisecondsSinceEpoch.toString() + '_banner';
 
-  //Creating a Function that will upload our Image in our Firebase Storage.
-  _uploadImageToStorage(dynamic image) async{
-    Reference ref = _firebaseStorage.ref().child('banners').child(fileName!); //Here what we are doing is we are creating a file named 'categories' in our Firebase Storage and also uploading the image with its 'fileName' which is the name of our File (Image) in our Local System.
+    Reference ref = _firebaseStorage
+        .ref()
+        .child('banners')
+        .child(uniqueFileName);
     UploadTask uploadTask = ref.putData(image);
 
-    TaskSnapshot snap = await uploadTask;  //Waiting till our uploading is done then storing that uploaded image details in Firebase Storage in 'snap'
-    String downloadUrl = await snap.ref.getDownloadURL(); //Storing the Url of our uploaded image in Firebase Storage in 'downloadUrl' and we will use it to save this in our Firestore Database (recall how we did it manually at the beginning).
+    TaskSnapshot snap = await uploadTask;
+    String downloadUrl = await snap.ref.getDownloadURL();
     return downloadUrl;
   }
 
-
-  //Creating a Function to store the details (present in Firebase Storage) of the Image uploaded in Firebase Storage in our Cloud Firestore from where we will mainly retrieve.
   uploadToFirestore() async {
-    if(_image!=null) {
-      EasyLoading.show(); //Starting our Easy Loading
-      String imageUrl = await _uploadImageToStorage(_image);
-      await _firestore.collection('banners').doc(fileName).set({ //Creating the collections in Firestore like we did previously manually in the beginning
-        'image': imageUrl,
-      }).whenComplete((){ //It denotes that when our function has been completed
-        EasyLoading.dismiss(); //Ending our Easy Loading
-        _image = null; //Resetting so that we can upload new image
-      });
-    }else { //This part means that our image has been not picked
+    if (_image != null) {
+      try {
+        EasyLoading.show(status: 'Uploading...');
+        String imageUrl = await _uploadImageToStorage(_image);
+
+        // Generate a unique document ID for the banner
+        String docId = DateTime.now().millisecondsSinceEpoch.toString();
+
+        await _firestore
+            .collection('banners')
+            .doc(docId)
+            .set({
+              'image': imageUrl,
+              'createdAt': FieldValue.serverTimestamp(),
+              // Removed fileName field as it's not needed in Firestore
+            })
+            .whenComplete(() {
+              EasyLoading.dismiss();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  backgroundColor: accentThemeColor,
+                  content: Text('Banner uploaded successfully!'),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+              setState(() {
+                _image = null;
+                fileName = null;
+              });
+            });
+      } catch (e) {
+        EasyLoading.dismiss();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: Colors.red,
+            content: Text('Error uploading banner: ${e.toString()}'),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.orange,
+          content: Text('Please select an image first'),
+          duration: Duration(seconds: 2),
+        ),
+      );
       EasyLoading.dismiss();
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Form(
-
       key: _formKey,
-
-      child: Column(
-
-        children: [
-
-          //Categories Screen Header
-          Padding(
-            padding: const EdgeInsets.all(8.0), //Giving padding in all directions.
-            child: Container(
-              alignment: Alignment.topLeft,
-
-              //Categories Screen Header Text and Style
-              child: Text('Banners',style: TextStyle(fontSize: 36,fontWeight: FontWeight.bold),),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Banner Screen Header
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                'Banners',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
             ),
-          ),
 
+            Divider(color: Colors.grey.shade300, thickness: 1),
 
-          //Divider is a horizontal line
-          Divider(
-            color: Colors.grey,
-          ),
-
-
-          Row( //To place items horizontally
-            children: [
-
-              Column( //To place items vertically within the row
-
-                children: [
-
-
-                  //Category Image Upload Box
-                  Container(
-                    height: 140,
-                    width: 150,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade500, //Color of the Category Image Upload Box
-                      border: Border.all( //Giving Border to our Category Image Upload Box
-                          color: Colors.grey.shade800 //Color of Border of the Category Image Upload Box
-                      ),
-                      borderRadius: BorderRadius.circular(10), //Making our Category Image Upload Box Circular
-                    ),
-
-                    child: Center(
-                      child: _image!=null ? Image.memory(_image) : Text( //This means that if our image is selected then display that image in this box else display this Text mentioned just in the next line.
-                        'Upload Image', //Text inside Category Image Upload Box
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                        ),),),
-
-                  ), //End of Category Image Upload Box
-
-
-                  //Category Image Upload Button
-                  Padding(
-                    padding: const EdgeInsets.all(10.0),
-                    child: ElevatedButton(
-                      onPressed: () {
-                        pickImage(); //Calling 'pickImage()' function when we press this button.
-                      },
-                      child: Text('Upload Image', //Text shown in the Button
-                        style: TextStyle(
-                          color: Colors.blue,
-                        ),
-                      ),
-
-                    ),
-                  ), //End of Category Image Upload Button
-
-
+            // Banner Upload Section
+            Container(
+              padding: const EdgeInsets.all(16.0),
+              margin: const EdgeInsets.symmetric(
+                vertical: 16.0,
+                horizontal: 16.0,
+              ),
+              decoration: BoxDecoration(
+                color: primaryThemeColor,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.2),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
                 ],
               ),
-
-
-              SizedBox(width: 30,), //Giving spacing horizontally as we are only mentioning 'width' and not 'height'.
-
-
-
-
-              //Button to Save our Category Name and Image and upload them to our Firebase
-              TextButton(
-                style: ButtonStyle(
-                  backgroundColor: MaterialStateProperty.all(
-                    Colors.white, //Background Color of our Button
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Upload New Banner',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
                   ),
-                  side: MaterialStateProperty.all(BorderSide(color: Colors.blue.shade900,),), //Border Color of our Button
-                ),
-                onPressed: () {
-                  uploadToFirestore(); //Calling this function which will upload our Category Name and Image in our Firebase.
-                } ,
-                child: const Text('Save', //Button Text
-                ),
+                  SizedBox(height: 16),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Image Preview Container
+                      Container(
+                        height: 160,
+                        width: 300,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: accentThemeColor),
+                        ),
+                        child:
+                            _image != null
+                                ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.memory(
+                                    _image,
+                                    fit: BoxFit.cover,
+                                  ),
+                                )
+                                : Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.image_outlined,
+                                        size: 40,
+                                        color: Colors.grey,
+                                      ),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        'Select banner image',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade700,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                      ),
+
+                      SizedBox(width: 24),
+
+                      // Upload Controls
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (fileName != null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 16.0),
+                              child: Text(
+                                'Selected file: $fileName',
+                                style: TextStyle(color: Colors.grey.shade700),
+                              ),
+                            ),
+
+                          ElevatedButton(
+                            onPressed: pickImage,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: accentThemeColor,
+                              side: BorderSide(color: accentThemeColor),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.file_upload_outlined),
+                                SizedBox(width: 8),
+                                Text('Choose Image'),
+                              ],
+                            ),
+                          ),
+
+                          SizedBox(height: 16),
+
+                          ElevatedButton(
+                            onPressed: uploadToFirestore,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: accentThemeColor,
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 12,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.save_outlined),
+                                SizedBox(width: 8),
+                                Text('Save Banner'),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
               ),
+            ),
 
-            ],
-          ),
+            SizedBox(height: 24),
 
-          //Displaying our present Banners stored in our Firebase
-          BannerListWidget(),
-
-        ],
+            // Banner List Section
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Banner Gallery',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  // Banner List Widget
+                  BannerListWidget(),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
