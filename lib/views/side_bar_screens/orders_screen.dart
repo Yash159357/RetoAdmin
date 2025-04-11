@@ -1,74 +1,121 @@
-
-
 import 'package:flutter/material.dart';
 import 'package:reto_admin/views/side_bar_screens/widgets/order_list_widget.dart';
 
 class OrdersScreen extends StatelessWidget {
-
   static const String id = 'orders-screen';
 
   const OrdersScreen({super.key});
 
-  //Reuseable Header. We will be using this Header multiple times.
+  // Theme colors
+  final Color primaryThemeColor = const Color.fromARGB(255, 255, 246, 233);
+  final Color accentThemeColor = const Color.fromARGB(210, 248, 186, 94);
+
+  // Reuseable Header. We will be using this Header multiple times.
   Widget rowHeader(int flex, String text) {
     return Expanded(
-        flex: flex,
-        child: Container(
+      flex: flex,
+      child: Container(
         decoration: BoxDecoration(
-        color: Color(0xFF3C55EF),
-        border: Border.all(
-          color: Colors.white,
+          color: accentThemeColor,
+          borderRadius: BorderRadius.circular(8),
         ),
-      ),
-
-
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Text(text,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Text(
+            text,
+            style: const TextStyle(
+              color: Colors.black87,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ),
-
-    ));
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(10.0),
-            child: Container(
-              alignment: Alignment.topLeft,
-              child: Text('Manage Orders',
-                style: const TextStyle(
-                  // color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
+    return Container(
+      color: Colors.white,
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header Section
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+                decoration: BoxDecoration(
+                  color: primaryThemeColor,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.2),
+                      spreadRadius: 1,
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Manage Orders',
+                      style: TextStyle(
+                        color: Colors.black87,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: accentThemeColor,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.shopping_bag_outlined, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'Orders',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ),
-
-          Row(
-            children: [
-              rowHeader(1, 'Image'), //Using our Reuseable Header
-              rowHeader(1, 'Product Name'),
-              rowHeader(2, 'Customer Name'), //Number denotes how much space we want to allocate in the Header
-              rowHeader(3, 'Address'),
-              rowHeader(1, 'Action'),
-              rowHeader(1, 'Reject'),
+              
+              const SizedBox(height: 24),
+              
+              // Column Headers Section
+              Row(
+                children: [
+                  rowHeader(1, 'Order ID'),
+                  rowHeader(1, 'Image'),
+                  rowHeader(1, 'Product'),
+                  rowHeader(1, 'Customer'),
+                  rowHeader(2, 'Address'),
+                  rowHeader(1, 'Status'),
+                ],
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Order List
+              const OrderListWidget(),
             ],
           ),
-
-          OrderListWidget(), //Calling 'OrderListWidget' to show all our orders
-
-        ],
+        ),
       ),
     );
   }
