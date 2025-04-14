@@ -30,6 +30,30 @@ class _CustomerListWidgetState extends State<CustomerListWidget> {
     );
   }
 
+  Widget rowHeader(int flex, String text) {
+    return Expanded(
+      flex: flex,
+      child: Container(
+        decoration: BoxDecoration(
+          color: accentThemeColor,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Text(
+            text,
+            style: const TextStyle(
+              color: Colors.black87,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget orderDisplayData(Widget widget, int? flex) {
     return Expanded(
       flex: flex!,
@@ -103,6 +127,17 @@ class _CustomerListWidgetState extends State<CustomerListWidget> {
               const SizedBox(width: 16),
             ],
           ),
+        ),
+
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            rowHeader(1, 'Customer ID'),
+            rowHeader(1, 'Name'),
+            rowHeader(3, 'Address'),
+            rowHeader(2, 'Email'),
+            rowHeader(1, 'Phone Number'),
+          ],
         ),
 
         const SizedBox(height: 16),

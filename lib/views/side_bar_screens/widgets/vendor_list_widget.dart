@@ -38,6 +38,30 @@ class _VendorListWidgetState extends State<VendorListWidget> {
     );
   }
 
+  Widget rowHeader(int flex, String text) {
+    return Expanded(
+      flex: flex,
+      child: Container(
+        decoration: BoxDecoration(
+          color: accentThemeColor,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Text(
+            text,
+            style: const TextStyle(
+              color: Colors.black87,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final Stream<QuerySnapshot> customersStream =
@@ -88,6 +112,17 @@ class _VendorListWidgetState extends State<VendorListWidget> {
               const SizedBox(width: 16),
             ],
           ),
+        ),
+
+        //Row Header
+        Row(
+          children: [
+            rowHeader(1, 'Vendor ID'),
+            rowHeader(1, 'Name'),
+            rowHeader(3, 'Address'),
+            rowHeader(2, 'Email'),
+            rowHeader(1, 'Phone Number'),
+          ],
         ),
 
         const SizedBox(height: 16),
