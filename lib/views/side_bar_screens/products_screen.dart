@@ -295,7 +295,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                 return null;
                               },
                               decoration: InputDecoration(
-                                labelText: 'Price(in rupees)',
+                                labelText: 'Price (₹)',
                                 labelStyle: TextStyle(
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -372,7 +372,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                               },
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return 'Enter discount %';
+                                  return 'Enter discounted price';
                                 }
                                 if (int.tryParse(value) == null) {
                                   return 'Invalid discount';
@@ -380,7 +380,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                                 return null;
                               },
                               decoration: InputDecoration(
-                                labelText: 'Discount %',
+                                labelText: 'Discounted Price (₹)',
                                 labelStyle: TextStyle(
                                   fontWeight: FontWeight.bold,
                                 ),
