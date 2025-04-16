@@ -10,30 +10,6 @@ class CustomersScreen extends StatelessWidget {
   final Color primaryThemeColor = const Color.fromARGB(255, 255, 246, 233);
   final Color accentThemeColor = const Color.fromARGB(210, 248, 186, 94);
 
-  Widget rowHeader(int flex, String text) {
-    return Expanded(
-      flex: flex,
-      child: Container(
-        decoration: BoxDecoration(
-          color: accentThemeColor,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Text(
-            text,
-            style: const TextStyle(
-              color: Colors.black87,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -78,19 +54,6 @@ class CustomersScreen extends StatelessWidget {
               ),
 
               const SizedBox(height: 24),
-
-              // Column Headers Section
-              Row(
-                children: [
-                  rowHeader(1, 'Customer ID'),
-                  rowHeader(1, 'Name'),
-                  rowHeader(3, 'Address'),
-                  rowHeader(2, 'Email'),
-                  rowHeader(1, 'Phone Number'),
-                ],
-              ),
-
-              const SizedBox(height: 16),
 
               // Order List
               const CustomerListWidget(),

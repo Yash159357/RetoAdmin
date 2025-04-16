@@ -78,17 +78,6 @@ class VendorsScreen extends StatelessWidget {
 
               const SizedBox(height: 15),
 
-              //Row Header
-              Row(
-                children: [
-                  rowHeader(1, 'Vendor ID'),
-                  rowHeader(1, 'Name'),
-                  rowHeader(3, 'Address'),
-                  rowHeader(2, 'Email'),
-                  rowHeader(1, 'Phone Number'),
-                ],
-              ),
-
               const VendorListWidget(),
             ],
           ),
