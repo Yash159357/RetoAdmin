@@ -97,21 +97,7 @@ class OrdersScreen extends StatelessWidget {
               
               const SizedBox(height: 24),
               
-              // Column Headers Section
-              Row(
-                children: [
-                  rowHeader(1, 'Order ID'),
-                  rowHeader(1, 'Image'),
-                  rowHeader(1, 'Product'),
-                  rowHeader(1, 'Customer'),
-                  rowHeader(2, 'Address'),
-                  rowHeader(1, 'Status'),
-                ],
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Order List
+              // The OrderListWidget now includes the search bar above column headers
               const OrderListWidget(),
             ],
           ),
