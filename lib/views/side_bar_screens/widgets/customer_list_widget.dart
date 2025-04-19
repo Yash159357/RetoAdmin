@@ -1,58 +1,24 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:reto_admin/views/side_bar_screens/inner_screens/customer_detail_dialog.dart';
 
 class CustomerListWidget extends StatefulWidget {
-  const CustomerListWidget({super.key});
+  final String searchQuery;
+  
+  const CustomerListWidget({
+    super.key, 
+    this.searchQuery = '',
+  });
 
   @override
   State<CustomerListWidget> createState() => _CustomerListWidgetState();
 }
 
 class _CustomerListWidgetState extends State<CustomerListWidget> {
-  String searchQuery = '';
   String searchField = 'name';
 
   final Color primaryThemeColor = const Color.fromARGB(255, 255, 246, 233);
   final Color accentThemeColor = const Color.fromARGB(210, 248, 186, 94);
-
-  Widget CustomerData(Widget widget, int? flex) {
-    return Expanded(
-      flex: flex!,
-
-      child: Container(
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey),
-          // color: Colors.grey,
-        ),
-
-        child: Padding(padding: const EdgeInsets.all(8.0), child: widget),
-      ),
-    );
-  }
-
-  Widget rowHeader(int flex, String text) {
-    return Expanded(
-      flex: flex,
-      child: Container(
-        decoration: BoxDecoration(
-          color: accentThemeColor,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Text(
-            text,
-            style: const TextStyle(
-              color: Colors.black87,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget orderDisplayData(Widget widget, int? flex) {
     return Expanded(
@@ -77,273 +43,272 @@ class _CustomerListWidgetState extends State<CustomerListWidget> {
     );
   }
 
+  void _deleteCustomer(String customerId) async {
+    try {
+      // Show confirmation dialog
+      bool confirm = await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: primaryThemeColor,
+          title: const Text('Delete Customer'),
+          content: const Text('Are you sure you want to delete this customer?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: accentThemeColor),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: accentThemeColor,
+              ),
+              child: const Text(
+                'Delete',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm == true) {
+        await FirebaseFirestore.instance
+            .collection('customers')
+            .doc(customerId)
+            .delete();
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Customer deleted successfully'),
+            backgroundColor: accentThemeColor,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error deleting customer: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _viewCustomerDetails(BuildContext context, Map<String, dynamic> customerData) {
+    showDialog(
+      context: context,
+      builder: (context) => CustomerDetailDialog(customerData: customerData),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final Stream<QuerySnapshot> customersStream =
         FirebaseFirestore.instance.collection('customers').snapshots();
 
-    return Column(
-      children: [
-        // Search Bar Section
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: primaryThemeColor,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Search customer by name',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: accentThemeColor),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: accentThemeColor),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: accentThemeColor, width: 2),
-                    ),
-                    filled: true,
-                    fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    prefixIcon: const Icon(Icons.search),
-                  ),
-                  onChanged: (value) {
-                    setState(() {
-                      searchQuery = value;
-                    });
-                  },
-                ),
+    return StreamBuilder<QuerySnapshot>(
+      stream: customersStream,
+      builder: (
+        BuildContext context,
+        AsyncSnapshot<QuerySnapshot> snapshot,
+      ) {
+        if (snapshot.hasError) {
+          return Text('Something went wrong');
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        List<QueryDocumentSnapshot> filteredDocs = snapshot.data!.docs;
+
+        if (widget.searchQuery.isNotEmpty) {
+          filteredDocs = filteredDocs.where((doc) {
+            if (!doc.data().toString().contains(searchField)) {
+              return false;
+            }
+
+            var fieldValue =
+                doc[searchField]?.toString().toLowerCase() ?? '';
+            return fieldValue.contains(widget.searchQuery.toLowerCase());
+          }).toList();
+        }
+
+        if (filteredDocs.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(20),
+            child: const Text('No customers match your search criteria.'),
+          );
+        }
+
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: filteredDocs.length,
+          itemBuilder: (context, index) {
+            final customerData = filteredDocs[index].data() as Map<String, dynamic>;
+            final customerId = filteredDocs[index].id;
+            
+            // Add the document ID to the customer data if not already there
+            if (customerData['uid'] == null) {
+              customerData['uid'] = customerId;
+            }
+
+            return Container(
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
               ),
-              const SizedBox(width: 16),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            rowHeader(1, 'Customer ID'),
-            rowHeader(1, 'Name'),
-            rowHeader(3, 'Address'),
-            rowHeader(2, 'Email'),
-            rowHeader(1, 'Phone Number'),
-          ],
-        ),
-
-        const SizedBox(height: 16),
-
-        StreamBuilder<QuerySnapshot>(
-          stream: customersStream,
-          builder: (
-            BuildContext context,
-            AsyncSnapshot<QuerySnapshot> snapshot,
-          ) {
-            if (snapshot.hasError) {
-              return Text('Something went wrong');
-            }
-
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const CircularProgressIndicator();
-            }
-
-            List<QueryDocumentSnapshot> filteredDocs = snapshot.data!.docs;
-
-            if (searchQuery.isNotEmpty) {
-              filteredDocs =
-                  filteredDocs.where((doc) {
-                    if (!doc.data().toString().contains(searchField)) {
-                      return false;
-                    }
-
-                    var fieldValue =
-                        doc[searchField]?.toString().toLowerCase() ?? '';
-                    return fieldValue.contains(searchQuery.toLowerCase());
-                  }).toList();
-            }
-
-            if (filteredDocs.isEmpty) {
-              return Container(
-                padding: const EdgeInsets.all(20),
-                child: const Text('No orders match your search criteria.'),
-              );
-            }
-
-            return ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: filteredDocs.length,
-              itemBuilder: (context, index) {
-                final customer = snapshot.data!.docs[index];
-                final orderData = filteredDocs[index];
-
-                return Container(
-                  margin: const EdgeInsets.symmetric(vertical: 4),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(8),
+              child: Row(
+                children: [
+                  // Customer ID Column
+                  orderDisplayData(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Customer ID',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          customerData['uid'] ?? 'N/A',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                    1,
                   ),
-                  child: Row(
-                    children: [
-                      // Customer ID Column
-                      orderDisplayData(
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Customer ID',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              orderData['uid'] ?? 'N/A',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        1,
-                      ),
 
-                      // Customer Name
-                      orderDisplayData(
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Name',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            Text(
-                              orderData['name'] ?? 'N/A',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
+                  // Customer Name
+                  orderDisplayData(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Name',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
                         ),
-                        1,
-                      ),
-
-                      // Address
-                      orderDisplayData(
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Address',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            Text(
-                              '${orderData['locality']} ${orderData['city']} ${orderData['state']} ${orderData['pinCode']}',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
+                        Text(
+                          customerData['name'] ?? 'N/A',
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        3,
-                      ),
-
-                      // Email
-                      orderDisplayData(
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Email',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            Text(
-                              orderData['email'] ?? 'N/A',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                        2,
-                      ),
-
-                      // Number
-                      orderDisplayData(
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Number',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            Text(
-                              orderData['number'] ?? 'N/A',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                        1,
-                      ),
-                    ],
+                      ],
+                    ),
+                    1,
                   ),
-                );
 
-                // return Row(
-                //   children: [
-                //     CustomerData(
-                //       SizedBox(
-                //         height: 50,
-                //         width: 50,
-                //         child: Icon(
-                //           Icons.person_rounded,
-                //           color: Colors.orange,
-                //         ), //No Customer Image Upload Option so for now this Icon will be displayed.
-                //       ),
-                //       1,
-                //     ),
+                  // Address
+                  orderDisplayData(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Address',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        Text(
+                          '${customerData['locality'] ?? ''} ${customerData['city'] ?? ''} ${customerData['state'] ?? ''} ${customerData['pinCode'] ?? ''}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                    3,
+                  ),
 
-                //     CustomerData(Text(customer['name']), 1),
+                  // Email
+                  orderDisplayData(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Email',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        Text(
+                          customerData['email'] ?? 'N/A',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                    2,
+                  ),
 
-                //     CustomerData(
-                //       Text(
-                //         '${customer['locality']} ${customer['city']} ${customer['state']} ${customer['pinCode']}',
-                //       ),
-                //       3,
-                //     ),
+                  // Number
+                  orderDisplayData(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Number',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        Text(
+                          customerData['number'] ?? 'N/A',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                    1,
+                  ),
 
-                //     CustomerData(Text(customer['email']), 2),
-
-                //     CustomerData(Text(customer['number']), 1),
-                //   ],
-                // );
-              },
+                  // Action Buttons
+                  Container(
+                    width: 100,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        // View Button
+                        IconButton(
+                          icon: Icon(Icons.visibility, color: accentThemeColor),
+                          onPressed: () => _viewCustomerDetails(context, customerData),
+                          tooltip: 'View Customer',
+                        ),
+                        // Delete Button
+                        IconButton(
+                          icon: Icon(Icons.delete, color: Colors.redAccent),
+                          onPressed: () => _deleteCustomer(customerId),
+                          tooltip: 'Delete Customer',
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             );
           },
-        ),
-      ],
+        );
+      },
     );
   }
 }

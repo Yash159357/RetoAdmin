@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:reto_admin/views/side_bar_screens/inner_screens/vendor_detail_dialog.dart';
 
 class VendorListWidget extends StatefulWidget {
   const VendorListWidget({super.key});
@@ -14,6 +15,63 @@ class _VendorListWidgetState extends State<VendorListWidget> {
 
   final Color primaryThemeColor = const Color.fromARGB(255, 255, 246, 233);
   final Color accentThemeColor = const Color.fromARGB(210, 248, 186, 94);
+  
+  // Map to store vendor earnings
+  Map<String, double> vendorEarnings = {};
+  bool isLoadingEarnings = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVendorEarnings();
+  }
+
+  Future<void> _loadVendorEarnings() async {
+    setState(() {
+      isLoadingEarnings = true;
+    });
+
+    try {
+      // Get all orders from Firestore
+      final QuerySnapshot ordersSnapshot = await FirebaseFirestore.instance
+          .collection('orders')
+          .get();
+
+      // Create a map to accumulate earnings per vendor
+      final Map<String, double> earningsMap = {};
+
+      // Process each order
+      for (final doc in ordersSnapshot.docs) {
+        final orderData = doc.data() as Map<String, dynamic>;
+        final vendorId = orderData['vendorId'] as String?;
+        final price = (orderData['price'] as num?)?.toDouble() ?? 0.0;
+
+        if (vendorId != null && vendorId.isNotEmpty) {
+          // Add to vendor's total earnings
+          earningsMap[vendorId] = (earningsMap[vendorId] ?? 0.0) + price;
+        }
+      }
+
+      // Update state with new earnings data
+      setState(() {
+        vendorEarnings = earningsMap;
+        isLoadingEarnings = false;
+      });
+    } catch (e) {
+      print('Error loading vendor earnings: $e');
+      setState(() {
+        isLoadingEarnings = false;
+      });
+      
+      // Show error message if in debug mode
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error loading vendor earnings'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
   Widget orderDisplayData(Widget widget, int? flex) {
     return Expanded(
@@ -62,14 +120,92 @@ class _VendorListWidgetState extends State<VendorListWidget> {
     );
   }
 
+  void _deleteVendor(String vendorId) async {
+    try {
+      // Show confirmation dialog
+      bool confirm = await showDialog(
+        context: context,
+        builder:
+            (context) => AlertDialog(
+              backgroundColor: primaryThemeColor,
+              title: const Text('Delete Vendor'),
+              content: const Text(
+                'Are you sure you want to delete this vendor?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(color: accentThemeColor),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: accentThemeColor,
+                  ),
+                  child: const Text(
+                    'Delete',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+      );
+
+      if (confirm == true) {
+        await FirebaseFirestore.instance
+            .collection('vendors')
+            .doc(vendorId)
+            .delete();
+
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Vendor deleted successfully'),
+            backgroundColor: accentThemeColor,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error deleting vendor: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _viewVendorDetails(
+    BuildContext context,
+    Map<String, dynamic> vendorData,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => VendorDetailDialog(vendorData: vendorData),
+    );
+  }
+
+  void _refreshEarnings() {
+    _loadVendorEarnings();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('Refreshing vendor earnings...'),
+        backgroundColor: accentThemeColor,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final Stream<QuerySnapshot> customersStream =
+    final Stream<QuerySnapshot> vendorsStream =
         FirebaseFirestore.instance.collection('vendors').snapshots();
 
     return Column(
       children: [
-        // Search Bar Section
+        // Search Bar Section with Refresh Button
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
@@ -110,10 +246,19 @@ class _VendorListWidgetState extends State<VendorListWidget> {
                 ),
               ),
               const SizedBox(width: 16),
+              // Add refresh button
+              IconButton(
+                icon: Icon(
+                  Icons.refresh,
+                  color: accentThemeColor,
+                ),
+                onPressed: _refreshEarnings,
+                tooltip: 'Refresh Earnings',
+              ),
             ],
           ),
         ),
-
+        const SizedBox(height: 16),
         //Row Header
         Row(
           children: [
@@ -122,220 +267,252 @@ class _VendorListWidgetState extends State<VendorListWidget> {
             rowHeader(3, 'Address'),
             rowHeader(2, 'Email'),
             rowHeader(1, 'Phone Number'),
+            rowHeader(1, 'Earnings'),
+            rowHeader(1, 'Actions'),
           ],
         ),
 
         const SizedBox(height: 16),
 
-        StreamBuilder<QuerySnapshot>(
-          stream: customersStream,
-          builder: (
-            BuildContext context,
-            AsyncSnapshot<QuerySnapshot> snapshot,
-          ) {
-            if (snapshot.hasError) {
-              return Text('Something went wrong');
-            }
+        isLoadingEarnings
+            ? const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            : StreamBuilder<QuerySnapshot>(
+                stream: vendorsStream,
+                builder: (
+                  BuildContext context,
+                  AsyncSnapshot<QuerySnapshot> snapshot,
+                ) {
+                  if (snapshot.hasError) {
+                    return Text('Something went wrong');
+                  }
 
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const CircularProgressIndicator();
-            }
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const CircularProgressIndicator();
+                  }
 
-            List<QueryDocumentSnapshot> filteredDocs = snapshot.data!.docs;
+                  List<QueryDocumentSnapshot> filteredDocs = snapshot.data!.docs;
 
-            if (searchQuery.isNotEmpty) {
-              filteredDocs =
-                  filteredDocs.where((doc) {
-                    if (!doc.data().toString().contains(searchField)) {
-                      return false;
-                    }
+                  if (searchQuery.isNotEmpty) {
+                    filteredDocs =
+                        filteredDocs.where((doc) {
+                          if (!doc.data().toString().contains(searchField)) {
+                            return false;
+                          }
 
-                    var fieldValue =
-                        doc[searchField]?.toString().toLowerCase() ?? '';
-                    return fieldValue.contains(searchQuery.toLowerCase());
-                  }).toList();
-            }
+                          var fieldValue =
+                              doc[searchField]?.toString().toLowerCase() ?? '';
+                          return fieldValue.contains(searchQuery.toLowerCase());
+                        }).toList();
+                  }
 
-            if (filteredDocs.isEmpty) {
-              return Container(
-                padding: const EdgeInsets.all(20),
-                child: const Text('No orders match your search criteria.'),
-              );
-            }
+                  if (filteredDocs.isEmpty) {
+                    return Container(
+                      padding: const EdgeInsets.all(20),
+                      child: const Text('No vendors match your search criteria.'),
+                    );
+                  }
 
-            return ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: filteredDocs.length,
-              itemBuilder: (context, index) {
-                final customer = snapshot.data!.docs[index];
-                final orderData = filteredDocs[index];
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: filteredDocs.length,
+                    itemBuilder: (context, index) {
+                      final vendorData =
+                          filteredDocs[index].data() as Map<String, dynamic>;
+                      final vendorId = filteredDocs[index].id;
 
-                return Container(
-                  margin: const EdgeInsets.symmetric(vertical: 4),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      // Customer ID Column
-                      orderDisplayData(
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      // Get the vendor's earnings from our pre-loaded map
+                      final earnings = vendorEarnings[vendorId] ?? 0.0;
+
+                      // Add the document ID to the vendor data if not already there
+                      if (vendorData['uid'] == null) {
+                        vendorData['uid'] = vendorId;
+                      }
+
+                      return Container(
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
                           children: [
-                            const Text(
-                              'Vender ID',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                color: Colors.grey,
+                            // Vendor ID Column
+                            orderDisplayData(
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Vendor ID',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    vendorData['uid'] ?? 'N/A',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
                               ),
+                              1,
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              orderData['uid'] ?? 'N/A',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
+
+                            // Vendor Name
+                            orderDisplayData(
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Name',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  Text(
+                                    vendorData['name'] ?? 'N/A',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                              1,
+                            ),
+
+                            // Address
+                            orderDisplayData(
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Address',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${vendorData['locality'] ?? ''} ${vendorData['city'] ?? ''} ${vendorData['state'] ?? ''} ${vendorData['pinCode'] ?? ''}',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                              3,
+                            ),
+
+                            // Email
+                            orderDisplayData(
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Email',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  Text(
+                                    vendorData['email'] ?? 'N/A',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                              2,
+                            ),
+
+                            // Number
+                            orderDisplayData(
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Number',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  Text(
+                                    vendorData['number'] ?? 'N/A',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                              1,
+                            ),
+                            // Earnings
+                            orderDisplayData(
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Earnings',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  Text(
+                                    '₹${earnings.toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              1,
+                            ),
+                            // Action Buttons
+                            Container(
+                              width: 100,
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  // View Button
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.visibility,
+                                      color: accentThemeColor,
+                                    ),
+                                    onPressed:
+                                        () => _viewVendorDetails(context, vendorData),
+                                    tooltip: 'View Vendor',
+                                  ),
+                                  // Delete Button
+                                  IconButton(
+                                    icon: Icon(Icons.delete, color: Colors.redAccent),
+                                    onPressed: () => _deleteVendor(vendorId),
+                                    tooltip: 'Delete Vendor',
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
-                        1,
-                      ),
-
-                      // Customer Name
-                      orderDisplayData(
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Name',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            Text(
-                              orderData['name'] ?? 'N/A',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                        1,
-                      ),
-
-                      // Address
-                      orderDisplayData(
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Address',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            Text(
-                              '${orderData['locality']} ${orderData['city']} ${orderData['state']} ${orderData['pinCode']}',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                        3,
-                      ),
-
-                      // Email
-                      orderDisplayData(
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Email',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            Text(
-                              orderData['email'] ?? 'N/A',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                        2,
-                      ),
-
-                      // Number
-                      orderDisplayData(
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Number',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            Text(
-                              orderData['number'] ?? 'N/A',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                        1,
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-
-            // return ListView.builder(
-            //   shrinkWrap: true,
-            //   itemCount: snapshot.data!.docs.length,
-
-            //   itemBuilder: (context, index) {
-            //     final customer = snapshot.data!.docs[index];
-            //     return Row(
-            //       children: [
-            //         VendorData(
-            //           SizedBox(
-            //             height: 50,
-            //             width: 50,
-            //             child: Icon(
-            //               Icons.person_rounded,
-            //               color: Colors.orange,
-            //             ), //No Customer Image Upload Option so for now this Icon will be displayed.
-            //           ),
-            //           1,
-            //         ),
-
-            //         VendorData(Text(customer['name']), 1),
-
-            //         VendorData(
-            //           Text(
-            //             '${customer['locality']} ${customer['city']} ${customer['state']} ${customer['pinCode']}',
-            //           ),
-            //           3,
-            //         ),
-
-            //         VendorData(Text(customer['email']), 2),
-
-            //         VendorData(Text(customer['number']), 1),
-            //       ],
-            //     );
-            //   },
-            // );
-          },
-        ),
+                      );
+                    },
+                  );
+                },
+              ),
       ],
     );
   }

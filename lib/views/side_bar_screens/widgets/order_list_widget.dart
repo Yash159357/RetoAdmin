@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:reto_admin/views/side_bar_screens/inner_screens/order_detail_dialog.dart';
 
 class OrderListWidget extends StatefulWidget {
   const OrderListWidget({super.key});
@@ -17,32 +18,6 @@ class _OrderListWidgetState extends State<OrderListWidget> {
   final Color accentThemeColor = const Color.fromARGB(210, 248, 186, 94);
 
   final searchFields = ['orderId', 'customerId', 'productId', 'category'];
-
-  void _updateOrderStatus(DocumentSnapshot orderData, String status) async {
-    // Placeholder for Firebase functionality when switching statuses
-    switch (status) {
-      case 'Processing':
-        // Add Firebase functionality for 'Processing' status here
-        break;
-
-      case 'Delivered':
-        // Add Firebase functionality for 'Delivered' status here
-        break;
-
-      case 'Placed':
-        // Placeholder for Firebase functionality for 'Placed' status
-        // Add your Firebase logic here
-        break;
-
-      case 'Canceled':
-        // Placeholder for Firebase functionality for 'Canceled' status
-        // Add your Firebase logic here
-        break;
-
-      default:
-        break;
-    }
-  }
 
   Color _getStatusColor(String status) {
     switch (status) {
@@ -64,13 +39,42 @@ class _OrderListWidgetState extends State<OrderListWidget> {
       return 'Processing';
     } else if (orderData['delivered'] == false &&
         orderData['processing'] == false) {
-      // This combination could mean either Placed or Canceled
-      // Since we don't store the Canceled state in Firebase, we'll have to visually represent it
-      // without actually changing the data
-      return 'Placed'; // Default to Placed when both are false
+      return 'Placed';
     } else {
       return 'Placed';
     }
+  }
+
+  Future<void> _deleteOrder(String orderId) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('orders')
+          .doc(orderId)
+          .delete();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Order deleted successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error deleting order: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _viewOrderDetails(DocumentSnapshot orderData) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => OrderDetailDialog(orderData: orderData),
+      ),
+    );
   }
 
   Widget orderDisplayData(Widget widget, int? flex) {
@@ -168,7 +172,7 @@ class _OrderListWidgetState extends State<OrderListWidget> {
           ),
         ),
 
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
 
         // Orders List
         StreamBuilder<QuerySnapshot>(
@@ -215,6 +219,7 @@ class _OrderListWidgetState extends State<OrderListWidget> {
               itemBuilder: (context, index) {
                 final orderData = filteredDocs[index];
                 final currentStatus = _getCurrentStatus(orderData);
+                final orderId = orderData.id;
 
                 return Container(
                   margin: const EdgeInsets.symmetric(vertical: 4),
@@ -243,6 +248,7 @@ class _OrderListWidgetState extends State<OrderListWidget> {
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                               ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
@@ -356,7 +362,7 @@ class _OrderListWidgetState extends State<OrderListWidget> {
                               ),
                             ),
                             Text(
-                              '${orderData['locality']} ${orderData['city']} ${orderData['state']} ${orderData['pinCode']}',
+                              '${orderData['locality'] ?? ''} ${orderData['city'] ?? ''} ${orderData['state'] ?? ''} ${orderData['pinCode'] ?? ''}',
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -393,12 +399,7 @@ class _OrderListWidgetState extends State<OrderListWidget> {
                               onChanged: (String? newValue) async {
                                 if (newValue != null &&
                                     newValue != currentStatus) {
-                                  // Update the status in Firebase
-                                  // await _updateOrderStatus(orderData, newValue);
-
-                                  // Update the UI to reflect the new status
                                   setState(() {
-                                    // Update the local data to reflect the new status
                                     if (newValue == 'Delivered') {
                                       orderData.reference.update({
                                         'delivered': true,
@@ -415,7 +416,6 @@ class _OrderListWidgetState extends State<OrderListWidget> {
                                         'delivered': false,
                                       });
                                     } else if (newValue == 'Canceled') {
-                                      // Handle the canceled state (if applicable)
                                       orderData.reference.update({
                                         'processing': false,
                                         'delivered': false,
@@ -448,6 +448,68 @@ class _OrderListWidgetState extends State<OrderListWidget> {
                           ],
                         ),
                         1,
+                      ),
+
+                      // Action Buttons (View & Delete)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Row(
+                          children: [
+                            // View Button - Added similar to customers screen
+                            IconButton(
+                              icon: Icon(
+                                Icons.visibility, 
+                                color: accentThemeColor,
+                              ),
+                              tooltip: 'View Order Details',
+                              onPressed: () => _viewOrderDetails(orderData),
+                            ),
+                            
+                            // Delete Button
+                            IconButton(
+                              icon: const Icon(
+                                Icons.delete,
+                                color: Colors.red,
+                              ),
+                              tooltip: 'Delete Order',
+                              onPressed: () {
+                                // Show confirmation dialog before deleting
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    backgroundColor: primaryThemeColor,
+                                    title: const Text('Delete Order'),
+                                    content: const Text(
+                                      'Are you sure you want to delete this order? This action cannot be undone.',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: Text(
+                                          'Cancel',
+                                          style: TextStyle(color: Colors.grey.shade700),
+                                        ),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          Navigator.pop(context);
+                                          _deleteOrder(orderId);
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.red,
+                                        ),
+                                        child: const Text(
+                                          'Delete',
+                                          style: TextStyle(color: Colors.white),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
