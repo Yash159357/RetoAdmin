@@ -19,6 +19,9 @@ class _VendorListWidgetState extends State<VendorListWidget> {
   // Map to store vendor earnings
   Map<String, double> vendorEarnings = {};
   bool isLoadingEarnings = true;
+  
+  // Map to track password visibility state for each vendor
+  Map<String, bool> passwordVisibility = {};
 
   @override
   void initState() {
@@ -71,6 +74,13 @@ class _VendorListWidgetState extends State<VendorListWidget> {
         ),
       );
     }
+  }
+
+  // Toggle password visibility for a specific vendor
+  void _togglePasswordVisibility(String vendorId) {
+    setState(() {
+      passwordVisibility[vendorId] = !(passwordVisibility[vendorId] ?? false);
+    });
   }
 
   Widget orderDisplayData(Widget widget, int? flex) {
@@ -267,6 +277,7 @@ class _VendorListWidgetState extends State<VendorListWidget> {
             rowHeader(3, 'Address'),
             rowHeader(2, 'Email'),
             rowHeader(1, 'Phone Number'),
+            rowHeader(1, 'Password'),  // Added Password header
             rowHeader(1, 'Earnings'),
             rowHeader(1, 'Actions'),
           ],
@@ -328,6 +339,12 @@ class _VendorListWidgetState extends State<VendorListWidget> {
 
                       // Get the vendor's earnings from our pre-loaded map
                       final earnings = vendorEarnings[vendorId] ?? 0.0;
+                      
+                      // Check if password is visible for this vendor
+                      final isPasswordVisible = passwordVisibility[vendorId] ?? false;
+                      
+                      // Get the password from vendor data
+                      final password = vendorData['password'] ?? '********';
 
                       // Add the document ID to the vendor data if not already there
                       if (vendorData['uid'] == null) {
@@ -456,6 +473,49 @@ class _VendorListWidgetState extends State<VendorListWidget> {
                               ),
                               1,
                             ),
+                            
+                            // Password Field - NEW
+                            orderDisplayData(
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Password',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          isPasswordVisible ? password : '••••••••',
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontFamily: isPasswordVisible ? null : 'monospace',
+                                            letterSpacing: isPasswordVisible ? null : 1.0,
+                                          ),
+                                        ),
+                                      ),
+                                      GestureDetector(
+                                        onTap: () => _togglePasswordVisibility(vendorId),
+                                        child: Icon(
+                                          isPasswordVisible 
+                                              ? Icons.visibility_off 
+                                              : Icons.visibility,
+                                          size: 18,
+                                          color: accentThemeColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              1,
+                            ),
+                            
                             // Earnings
                             orderDisplayData(
                               Column(

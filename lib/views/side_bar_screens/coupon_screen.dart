@@ -17,7 +17,7 @@ class _CouponScreenState extends State<CouponScreen> {
   final TextEditingController _couponNameController = TextEditingController();
   final TextEditingController _discountController = TextEditingController();
 
-  // Theme colors to match existing screens
+  // Theme colors
   final Color primaryThemeColor = const Color.fromARGB(255, 255, 246, 233);
   final Color accentThemeColor = const Color.fromARGB(210, 248, 186, 94);
 

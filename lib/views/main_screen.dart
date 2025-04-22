@@ -1,5 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:reto_admin/views/side_bar_screens/category_screen.dart';
 import 'package:reto_admin/views/side_bar_screens/coupon_screen.dart';
 import 'package:reto_admin/views/side_bar_screens/customers_screen.dart';
@@ -19,6 +21,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget _selectedScreen = CustomersScreen();
   String _selectedRoute = CustomersScreen.id;
   int? _hoveredIndex;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Menu items for our sidebar
   final List<Map<String, dynamic>> _menuItems = [
@@ -83,20 +86,45 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  String displayName = 'Loading...';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDisplayName();
+  }
+
+  Future<void> _fetchDisplayName() async {
+    final docSnapshot = await FirebaseFirestore.instance
+        .collection('vendors')
+        .doc(FirebaseAuth.instance.currentUser?.uid)
+        .get();
+
+    if (docSnapshot.exists) {
+      setState(() {
+        displayName = docSnapshot['name'] ?? 'No name available';
+      });
+    } else {
+      setState(() {
+        displayName = 'No name available';
+      });
+    }
+  }
   @override
   Widget build(BuildContext context) {
     final Color accentThemeColor = const Color.fromARGB(210, 248, 186, 94);
     final Color backgroundColor = const Color.fromARGB(255, 255, 246, 233);
-    
+
+    // Get current user from Firebase Auth
+    User? currentUser = _auth.currentUser;
+    String email = currentUser?.email ?? 'No email available';
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: accentThemeColor,
         title: const Text(
           "RetoRADIANCE",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
         ),
         elevation: 2,
         actions: [
@@ -133,9 +161,12 @@ class _MainScreenState extends State<MainScreen> {
             color: backgroundColor,
             child: Column(
               children: [
-                // Admin info section
+                // Admin info section with user name and email
                 Container(
-                  padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 15),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 20,
+                    horizontal: 15,
+                  ),
                   decoration: BoxDecoration(
                     color: backgroundColor,
                     border: Border(
@@ -160,21 +191,23 @@ class _MainScreenState extends State<MainScreen> {
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
+                          children: [
                             Text(
-                              'Admin User',
-                              style: TextStyle(
+                              displayName,
+                              style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
                               ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Text(
-                              'Super Admin',
-                              style: TextStyle(
+                              email,
+                              style: const TextStyle(
                                 color: Colors.grey,
                                 fontSize: 12,
                               ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
@@ -182,7 +215,7 @@ class _MainScreenState extends State<MainScreen> {
                     ],
                   ),
                 ),
-                
+
                 // Menu section
                 Expanded(
                   child: ListView.builder(
@@ -192,70 +225,90 @@ class _MainScreenState extends State<MainScreen> {
                       final item = _menuItems[index];
                       final bool isSelected = _selectedRoute == item['route'];
                       final bool isHovered = _hoveredIndex == index;
-                      
+
                       return Column(
                         children: [
                           MouseRegion(
-                            onEnter: (_) => setState(() => _hoveredIndex = index),
+                            onEnter:
+                                (_) => setState(() => _hoveredIndex = index),
                             onExit: (_) => setState(() => _hoveredIndex = null),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
-                              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              margin: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
-                                color: isSelected 
-                                    ? accentThemeColor.withOpacity(0.2) 
-                                    : isHovered
+                                color:
+                                    isSelected
+                                        ? accentThemeColor.withOpacity(0.2)
+                                        : isHovered
                                         ? Colors.grey.withOpacity(0.1)
                                         : Colors.transparent,
                                 borderRadius: BorderRadius.circular(8),
-                                boxShadow: isHovered || isSelected
-                                    ? [
-                                        BoxShadow(
-                                          color: accentThemeColor.withOpacity(0.1),
-                                          blurRadius: 5,
-                                          offset: const Offset(0, 2),
-                                        )
-                                      ]
-                                    : [],
+                                boxShadow:
+                                    isHovered || isSelected
+                                        ? [
+                                          BoxShadow(
+                                            color: accentThemeColor.withOpacity(
+                                              0.1,
+                                            ),
+                                            blurRadius: 5,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ]
+                                        : [],
                               ),
                               child: ListTile(
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 4,
+                                ),
                                 leading: Icon(
                                   item['icon'],
-                                  color: isSelected || isHovered 
-                                      ? accentThemeColor 
-                                      : Colors.grey[700],
+                                  color:
+                                      isSelected || isHovered
+                                          ? accentThemeColor
+                                          : Colors.grey[700],
                                   size: 22,
                                 ),
                                 title: Text(
                                   item['title'],
                                   style: TextStyle(
-                                    color: isSelected || isHovered 
-                                        ? Colors.black 
-                                        : Colors.grey[800],
-                                    fontWeight: isSelected 
-                                        ? FontWeight.bold 
-                                        : FontWeight.normal,
+                                    color:
+                                        isSelected || isHovered
+                                            ? Colors.black
+                                            : Colors.grey[800],
+                                    fontWeight:
+                                        isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
                                     fontSize: 14,
                                   ),
                                 ),
-                                trailing: item.containsKey('badgeCount')
-                                    ? Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: accentThemeColor,
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Text(
-                                          '${item['badgeCount']}',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
+                                trailing:
+                                    item.containsKey('badgeCount')
+                                        ? Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 2,
                                           ),
-                                        ),
-                                      )
-                                    : null,
+                                          decoration: BoxDecoration(
+                                            color: accentThemeColor,
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            '${item['badgeCount']}',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        )
+                                        : null,
                                 onTap: () => _selectMenuItem(item['route']),
                               ),
                             ),
@@ -263,7 +316,9 @@ class _MainScreenState extends State<MainScreen> {
                           // Add a separator if not the last item
                           if (index < _menuItems.length - 1)
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 24),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                              ),
                               child: Divider(
                                 height: 1,
                                 thickness: 0.5,
@@ -275,10 +330,13 @@ class _MainScreenState extends State<MainScreen> {
                     },
                   ),
                 ),
-                
+
                 // Footer section
                 Container(
-                  padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 15),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 15,
+                    horizontal: 15,
+                  ),
                   decoration: BoxDecoration(
                     color: backgroundColor,
                     border: Border(
@@ -290,20 +348,19 @@ class _MainScreenState extends State<MainScreen> {
                   ),
                   child: InkWell(
                     onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Logout function will be implemented here'),
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
+                      // Implement logout functionality
+                      _auth.signOut().then((_) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Logged out successfully'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      });
                     },
                     child: Row(
                       children: [
-                        Icon(
-                          Icons.logout,
-                          color: Colors.grey[700],
-                          size: 20,
-                        ),
+                        Icon(Icons.logout, color: Colors.grey[700], size: 20),
                         const SizedBox(width: 12),
                         Text(
                           'Logout',
@@ -319,13 +376,10 @@ class _MainScreenState extends State<MainScreen> {
               ],
             ),
           ),
-          
+
           // Divider between sidebar and content
-          Container(
-            width: 1,
-            color: Colors.grey.withOpacity(0.2),
-          ),
-          
+          Container(width: 1, color: Colors.grey.withOpacity(0.2)),
+
           // Main content area
           Expanded(
             child: Container(
