@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:reto_admin/views/side_bar_screens/widgets/vendor_list_widget.dart';
+import 'package:reto_admin/views/side_bar_screens/inner_screens/vendor_create_dialog.dart'; // Import new dialog
 
 class VendorsScreen extends StatelessWidget {
   static const String id = '\vendors-screen';
@@ -33,6 +34,24 @@ class VendorsScreen extends StatelessWidget {
     );
   }
 
+  void _showCreateVendorDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => const CreateVendorDialog(),
+    ).then((result) {
+      // Show a success message if the dialog returns true
+      if (result == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Vendor account created successfully!'),
+            backgroundColor: accentThemeColor,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -47,7 +66,7 @@ class VendorsScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(
                   vertical: 16,
-                  horizontal: 8,
+                  horizontal: 16,
                 ),
                 decoration: BoxDecoration(
                   color: primaryThemeColor,
@@ -64,12 +83,29 @@ class VendorsScreen extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
+                    const Text(
                       'Manage Vendors',
                       style: TextStyle(
                         color: Colors.black87,
                         fontSize: 24,
                         fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    // Add Create Vendor Button
+                    ElevatedButton.icon(
+                      onPressed: () => _showCreateVendorDialog(context),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Create Vendor'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: accentThemeColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
                   ],
